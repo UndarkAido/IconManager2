@@ -2,6 +2,7 @@ build
 winbuild
 test
 input
+output
 
 # Created by https://www.toptal.com/developers/gitignore/api/c++,clion+all,linux,windows,cmake
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,clion+all,linux,windows,cmake
