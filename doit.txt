@@ -1,0 +1,1 @@
+cmake -B output -G "Unix Makefiles" .; cmake --build output -j 1; cmake -B output .; cmake --build output -j 1
