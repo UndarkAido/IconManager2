@@ -1,15 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
-project(IconManager2)
+project(IconManager2 NONE)
 
-if(WIN32)
+if (WIN32)
     set(CONVERT magick.exe convert)
     set(IDENTIFY magick.exe identify)
     set(INKSCAPE inkscape.com)
-else()
+    set(SLEEP cmake -E sleep .003)
+else ()
     set(CONVERT convert)
     set(IDENTIFY identify)
     set(INKSCAPE env _INKSCAPE_GC=disable inkscape)
-endif()
+    set(SLEEP cmake -E sleep .003)
+endif ()
 
 add_custom_target(RerunCmake ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR})
 
@@ -22,14 +24,15 @@ file(GLOB_RECURSE
         WEBPs
         FOLLOW_SYMLINKS
         input/*.webp
-        )]]#
+        )]]
+#
 file(GLOB_RECURSE
         SVGs
         FOLLOW_SYMLINKS
         input/*.svg
         )
 
-foreach(PNG IN LISTS PNGs)
+foreach (PNG IN LISTS PNGs)
     get_filename_component(Dir ${PNG} DIRECTORY)
     STRING(REGEX REPLACE "^${CMAKE_SOURCE_DIR}/input/" "" Dir ${Dir})
     get_filename_component(Name ${PNG} NAME_WE)
@@ -46,12 +49,15 @@ foreach(PNG IN LISTS PNGs)
             OUTPUT ${PNGPath}
             COMMAND cp ${PNG} ${Dir}/${Name}.png
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )]]#
+    )]]
+    #
     #configure_file(${PNG} ${IMGPath}.png COPYONLY)
     add_custom_command(
             OUTPUT ${IMGPath}.png
+            COMMAND ${SLEEP}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${Dir}
-            COMMAND ${CMAKE_COMMAND} -E copy ${PNG} ${IMGPath}.png
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PNG} ${IMGPath}.png
+            COMMAND ${SLEEP}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
@@ -61,7 +67,7 @@ foreach(PNG IN LISTS PNGs)
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             DEPENDS ${IMGPath}.png
     )
-endforeach()
+endforeach ()
 #[[foreach(WEBP IN LISTS WEBPs)
     get_filename_component(Dir ${WEBP} DIRECTORY)
     STRING(REGEX REPLACE "^${CMAKE_SOURCE_DIR}/input/" "" Dir ${Dir})
@@ -78,7 +84,9 @@ endforeach()
 
     add_custom_command(
             OUTPUT ${PNGPath}
+            COMMAND ${SLEEP}
             COMMAND ${CONVERT} "${WEBP}" "PNG32:${IMGPath}.png"
+            COMMAND ${SLEEP}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
@@ -88,8 +96,9 @@ endforeach()
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             DEPENDS ${IMGPath}.png
     )
-endforeach()]]#
-foreach(SVG IN LISTS SVGs)
+endforeach()]]
+#
+foreach (SVG IN LISTS SVGs)
     get_filename_component(Dir ${SVG} DIRECTORY)
     STRING(REGEX REPLACE "^${CMAKE_SOURCE_DIR}/input/" "" Dir ${Dir})
     get_filename_component(Name ${SVG} NAME_WE)
@@ -104,8 +113,10 @@ foreach(SVG IN LISTS SVGs)
 
     add_custom_command(
             OUTPUT ${IMGPath}.png
+            COMMAND ${SLEEP}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${Dir}
             COMMAND ${INKSCAPE} -o "${IMGPath}.png" -w 512 "${SVG}"
+            COMMAND ${SLEEP}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
@@ -115,16 +126,18 @@ foreach(SVG IN LISTS SVGs)
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             DEPENDS ${IMGPath}.png
     )
-endforeach()
+endforeach ()
 
-foreach(IMG IN LISTS IMGs)
+foreach (IMG IN LISTS IMGs)
     STRING(REGEX REPLACE "/" "." IMGTarget ${IMG})
     STRING(REGEX REPLACE " " "_" IMGTarget ${IMGTarget})
 
     #magick convert "$filedir\$filename$namemod.png" -trim "PNG32:$filedir\$filename[Magick].png"
     add_custom_command(
             OUTPUT ${IMG}[Trim].png
+            COMMAND ${SLEEP}
             COMMAND ${CONVERT} "${IMG}.png" -trim "PNG32:${IMG}[Trim].png"
+            COMMAND ${SLEEP}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             DEPENDS ${IMG}.png
     )
@@ -135,25 +148,27 @@ foreach(IMG IN LISTS IMGs)
             DEPENDS ${IMG}[Trim].png
     )
 
-    if(EXISTS "${IMG}[Trim].png")
-        set(IMGDEPEND ${IMG}[Trim].png)
-        if(DEFINED "${IMGTarget}+DIM")
+    if (EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${IMG}[Trim].png")
+        set(IMGDEPEND ${CMAKE_CURRENT_BINARY_DIR}/${IMG}[Trim].png)
+        if (DEFINED "${IMGTarget}+DIM")
             set(IMGDIM "${${IMGTarget}+DIM}")
-        else()
-            execute_process(COMMAND ${IDENTIFY} -format "%[fx:w];%[fx:h]" ${IMG}[Trim].png OUTPUT_VARIABLE IMGDIM)
+        else ()
+            execute_process(COMMAND ${IDENTIFY} -format "%[fx:w];%[fx:h]" ${CMAKE_CURRENT_BINARY_DIR}/${IMG}[Trim].png OUTPUT_VARIABLE IMGDIM)
             set("${IMGTarget}+DIM" ${IMGDIM} CACHE INTERNAL "")
-        endif()
+        endif ()
         list(GET IMGDIM 0 W)
         list(GET IMGDIM 1 H)
-        if(${W} GREATER ${H})
+        if (${W} GREATER ${H})
             set(S ${W})
-        else()
+        else ()
             set(S ${H})
-        endif()
+        endif ()
 
         add_custom_command(
                 OUTPUT ${IMG}[Square].png
+                COMMAND ${SLEEP}
                 COMMAND ${CONVERT} "${IMG}[Trim].png" -background transparent -gravity center -resize "${S}x${S}" -extent "${S}x${S}" "PNG32:${IMG}[Square].png"
+                COMMAND ${SLEEP}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                 DEPENDS ${IMG}[Trim].png
         )
@@ -164,62 +179,96 @@ foreach(IMG IN LISTS IMGs)
                 DEPENDS ${IMG}[Square].png
         )
 
-        set(small    48)
-        set(medium  100)
-        set(large   204)
+        set(small 48)
+        set(medium 100)
+        set(large 204)
         #set(border   20)
-        math(EXPR bsmall  "${small}  - (${small} / 10)")
+        math(EXPR bsmall "${small}  - (${small} / 10)")
         math(EXPR bmedium "${medium} - (${medium} / 10)")
-        math(EXPR blarge  "${large}  - (${large} / 10)")
+        math(EXPR blarge "${large}  - (${large} / 10)")
         set(
                 sizes
-                "Favicon"      "0"          "16"         "16x16"                 "16x16"               "center"
-                "Small"        "0"          "${small}"   "${small}x${small}"     "${small}x${small}"   "center"
-                "Medium"       "${small}"   "${medium}"  "${medium}x${medium}"   "${medium}x${medium}" "center"
-                "Large"        "${medium}"  "${large}"   "${large}x${large}"     "${large}x${large}"   "center"
-                "Wide"         "${small}"   "${medium}"  "${large}x${medium}"    "${large}x${medium}"  "center"
-                "Wide2"        "${medium}"  "${large}"   "${large}"              "${large}x${medium}"  "center"
-                "Wide3"        "${medium}"  "${large}"   "${large}"              "${large}x${medium}"  "north"
-                "BorderSmall"  "0"          "${bsmall}"  "${bsmall}x${bsmall}"   "${small}x${small}"   "center"
-                "BorderMedium" "${bsmall}"  "${bmedium}" "${bmedium}x${bmedium}" "${medium}x${medium}" "center"
-                "BorderLarge"  "${bmedium}" "${blarge}"  "${blarge}x${blarge}"   "${large}x${large}"   "center"
-                "BorderWide"   "${bsmall}"  "${bmedium}" "${blarge}x${bmedium}"  "${large}x${medium}"  "center"
-                "BorderWide2"  "${bmedium}" "${blarge}"  "${blarge}"             "${large}x${medium}"  "center"
-                "BorderWide3"  "${bmedium}" "${blarge}"  "${blarge}"             "${large}x${medium}"  "north"
+                "Favicon" "0" "16" "16x16" "16x16" "center"
+                "Small" "0" "${small}" "${small}x${small}" "${small}x${small}" "center"
+                "Medium" "${small}" "${medium}" "${medium}x${medium}" "${medium}x${medium}" "center"
+                "Large" "${medium}" "${large}" "${large}x${large}" "${large}x${large}" "center"
+                "Wide" "${small}" "${medium}" "${large}x${medium}" "${large}x${medium}" "center"
+                "Wide2" "${medium}" "${large}" "${large}" "${large}x${medium}" "center"
+                "Wide3" "${medium}" "${large}" "${large}" "${large}x${medium}" "north"
+                "BorderSmall" "0" "${bsmall}" "${bsmall}x${bsmall}" "${small}x${small}" "center"
+                "BorderMedium" "${bsmall}" "${bmedium}" "${bmedium}x${bmedium}" "${medium}x${medium}" "center"
+                "BorderLarge" "${bmedium}" "${blarge}" "${blarge}x${blarge}" "${large}x${large}" "center"
+                "BorderWide" "${bsmall}" "${bmedium}" "${blarge}x${bmedium}" "${large}x${medium}" "center"
+                "BorderWide2" "${bmedium}" "${blarge}" "${blarge}" "${large}x${medium}" "center"
+                "BorderWide3" "${bmedium}" "${blarge}" "${blarge}" "${large}x${medium}" "north"
         )
-        while(sizes)
+        while (sizes)
             list(POP_FRONT sizes name minBorder minResize resize extent gravity)
-            if(${S} GREATER_EQUAL ${minResize})
+            if (${S} GREATER_EQUAL ${minResize})
                 # ${CONVERT} "$filedir\$filename$namemod.png" -background transparent -gravity $value[$gravity] -resize $value[$resize] -filter lanczos -extent $value[$extent] "PNG32:$filedir\$filename[$key].png"
                 add_custom_command(
                         OUTPUT ${IMG}[${name}].png
-                        COMMAND ${CONVERT} "${IMG}[Square].png" -background transparent -gravity ${gravity} -resize "${resize}" -filter lanczos -extent "${extent}" "PNG32:${IMG}[${name}].png"
+                        COMMAND ${SLEEP}
+                        COMMAND ${CMAKE_COMMAND} -E copy "${IMG}[Square].png" "${IMG}[Square][${name}].png"
+                        COMMAND ${CONVERT} "${IMG}[Square][${name}].png" -background transparent -gravity ${gravity} -resize "${resize}" -filter lanczos -extent "${extent}" "PNG32:${IMG}[${name}].png"
+                        COMMAND ${CMAKE_COMMAND} -E rm "${IMG}[Square][${name}].png"
+                        COMMAND ${SLEEP}
                         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                         DEPENDS ${IMG}[Square].png
                 )
-            elseif(${S} GREATER_EQUAL ${minBorder})
+            elseif (${S} GREATER_EQUAL ${minBorder})
                 # ${CONVERT} "$filedir\$filename$namemod.png" -background transparent -gravity $value[$gravity]                                         -extent $value[$extent] "PNG32:$filedir\$filename[$key].png"
                 add_custom_command(
                         OUTPUT ${IMG}[${name}].png
-                        COMMAND ${CONVERT} "${IMG}[Square].png" -background transparent -gravity ${gravity}                                     -extent "${extent}" "PNG32:${IMG}[${name}].png"
+                        COMMAND ${SLEEP}
+                        COMMAND ${CMAKE_COMMAND} -E copy "${IMG}[Square].png" "${IMG}[Square][${name}].png"
+                        COMMAND ${CONVERT} "${IMG}[Square][${name}].png" -background transparent -gravity ${gravity} -extent "${extent}" "PNG32:${IMG}[${name}].png"
+                        COMMAND ${CMAKE_COMMAND} -E rm "${IMG}[Square][${name}].png"
+                        COMMAND ${SLEEP}
                         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                         DEPENDS ${IMG}[Square].png
                 )
-            endif()
-            if(${S} GREATER_EQUAL ${minBorder})
+            endif ()
+            if (${S} GREATER_EQUAL ${minBorder})
                 add_custom_target(
                         ${IMGTarget}+${name} ALL
                         COMMAND :
                         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                         DEPENDS ${IMG}[${name}].png
                 )
-            endif()
+            endif ()
         endwhile ()
-    else()
+
+        if (${S} GREATER_EQUAL 16)
+            set(ICOSIZES "")
+            foreach (X IN ITEMS 256 192 128 96 64 48 32 24)
+                if (${S} GREATER_EQUAL ${X})
+                    set(ICOSIZES ${ICOSIZES}${X},)
+                endif ()
+            endforeach ()
+            set(ICOSIZES ${ICOSIZES}16)
+            add_custom_command(
+                    OUTPUT ${IMG}.ico
+                    COMMAND ${SLEEP}
+                    COMMAND ${CMAKE_COMMAND} -E copy "${IMG}[Square].png" "${IMG}[Square][ICO].png"
+                    COMMAND ${CONVERT} "${IMG}[Square][ICO].png" -background transparent -define icon:auto-resize=${ICOSIZES} "${IMG}.ico"
+                    COMMAND ${CMAKE_COMMAND} -E rm "${IMG}[Square][ICO].png"
+                    COMMAND ${SLEEP}
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                    DEPENDS ${IMG}[Square].png
+            )
+            add_custom_target(
+                    ${IMGTarget}+ICO ALL
+                    COMMAND :
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                    DEPENDS ${IMG}.ico
+            )
+        endif ()
+    else ()
         set(IMGDEPEND RerunCmake)
-    endif()
-endforeach()
+    endif ()
+endforeach ()
 
-if(REBUILD)
+if (REBUILD)
 
-endif()
+endif ()
